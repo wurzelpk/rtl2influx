@@ -1,5 +1,4 @@
-mod records;
-use records::accurite::AccuriteRecord;
+use rtl2influx::records::accurite::AccuriteRecord;
 
 fn main() {
     println!("Hello, world!");
