@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 
 #[derive(Clone)]
 pub struct InfluxSender {
-    pub records_rx: Arc<Mutex<mpsc::Receiver<AccuriteRecord>>>,
+    pub records_rx: Arc<Mutex<mpsc::Receiver<Vec<u8>>>>,
 }
 
 #[async_trait]
@@ -18,7 +18,7 @@ impl SupervisedTask for InfluxSender {
         loop {
             match rx.recv().await {
                 Some(record) => {
-                    println!("Received record: {:?}", record);
+                    println!("Received record: {}", String::from_utf8(record)?);
                     // Here you would add code to send the record to InfluxDB
                 }
                 None => {

@@ -1,11 +1,10 @@
 use rtl2influx::influx_sender::InfluxSender;
-use rtl2influx::records::accurite::AccuriteRecord;
 use rtl2influx::rtl_runner::RtlRunner;
-use task_supervisor::{SupervisedTask, SupervisorBuilder};
+use task_supervisor::SupervisorBuilder;
 
 #[tokio::main]
 async fn main() {
-    let (tx, _rx) = tokio::sync::mpsc::channel::<AccuriteRecord>(20);
+    let (tx, rx) = tokio::sync::mpsc::channel::<Vec<u8>>(20);
 
     // Build the supervisor with initial tasks
     let supervisor = SupervisorBuilder::default().build();
@@ -18,7 +17,7 @@ async fn main() {
         .add_task(
             "influx_sender",
             InfluxSender {
-                records_rx: std::sync::Arc::new(tokio::sync::Mutex::new(_rx)),
+                records_rx: std::sync::Arc::new(tokio::sync::Mutex::new(rx)),
             },
         )
         .unwrap();
