@@ -1,10 +1,11 @@
+use influxdb2::models::data_point::DataPointBuilder;
 use rtl2influx::influx_sender::InfluxSender;
 use rtl2influx::rtl_runner::RtlRunner;
 use task_supervisor::SupervisorBuilder;
 
 #[tokio::main]
 async fn main() {
-    let (tx, rx) = tokio::sync::mpsc::channel::<Vec<u8>>(20);
+    let (tx, rx) = tokio::sync::mpsc::channel::<DataPointBuilder>(20);
 
     // Build the supervisor with initial tasks
     let supervisor = SupervisorBuilder::default().build();

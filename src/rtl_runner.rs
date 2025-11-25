@@ -1,6 +1,7 @@
 use crate::records::accurite::AccuriteRecord;
 use async_trait::async_trait;
-use influxdb_line_protocol::builder::LineProtocolBuilder;
+use influxdb2::models::DataPoint;
+use influxdb2::models::data_point::DataPointBuilder;
 use std::process::Stdio;
 use std::time::Duration;
 use std::time::SystemTime;
@@ -11,7 +12,7 @@ use tokio::sync::mpsc;
 
 #[derive(Clone)]
 pub struct RtlRunner {
-    pub records_tx: mpsc::Sender<Vec<u8>>,
+    pub records_tx: mpsc::Sender<DataPointBuilder>,
 }
 
 #[async_trait]
@@ -42,21 +43,17 @@ impl SupervisedTask for RtlRunner {
                 .unwrap()
                 .as_nanos(); // u128
 
-            let line_writeable = LineProtocolBuilder::new()
-                .measurement("accurite_tower")
+            let line_writeable = DataPoint::builder("test_rtl")
                 .tag("model", &record.model)
                 .tag("channel", &record.channel)
                 .tag("id", format!("{}", record.id).as_str())
                 .field("battery_ok", record.battery_ok)
                 .field("temperature_c", record.temperature_c)
                 .field("humidity", record.humidity as i64)
-                .timestamp(timestamp_nanos as i64)
-                .close_line();
-
-            let out_buf = line_writeable.build();
+                .timestamp(timestamp_nanos as i64);
 
             self.records_tx
-                .send(out_buf)
+                .send(line_writeable)
                 .await
                 .map_err(|e| TaskError::msg(format!("Failed to send record: {}", e)))?;
             line.clear(); // Clear the buffer for the next line
