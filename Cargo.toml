@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.100"
 async-trait = "0.1.89"
+config = "0.15.19"
 futures = "0.3.31"
 influxdb-line-protocol = "2.0.0"
 influxdb2 = "0.5.2"
