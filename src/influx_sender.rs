@@ -81,6 +81,11 @@ impl InfluxSender {
             return Ok(());
         }
         println!("Uploading {} points to InfluxDB...", points.len());
+        if true {
+            for p in &points {
+                println!("Point: {:?}", p);
+            }
+        }
         client
             .write(&self.influx_config.bucket, stream::iter(points))
             .await

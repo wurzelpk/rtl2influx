@@ -2,8 +2,6 @@ use serde::Deserialize;
 use serde::de::{self, Deserializer, Visitor};
 use std::fmt;
 
-// File: src/records/accurite.rs
-
 /// Represents an Acurite "tower" record as JSON-deserialized with serde_json.
 #[derive(Debug, Deserialize)]
 pub struct AccuriteRecord {
