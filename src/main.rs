@@ -1,8 +1,17 @@
 use config::Config;
 use influxdb2::models::data_point::DataPointBuilder;
+use rtl2influx::influx_sender::InfluxConfig;
 use rtl2influx::influx_sender::InfluxSender;
+use rtl2influx::influx_sender::UploadConfig;
 use rtl2influx::rtl_runner::RtlRunner;
 use task_supervisor::SupervisorBuilder;
+
+#[derive(serde::Deserialize)]
+struct AppConfig {
+    pub node: String,
+    pub influx: InfluxConfig,
+    pub upload: Option<UploadConfig>,
+}
 
 #[tokio::main]
 async fn main() {
@@ -14,7 +23,7 @@ async fn main() {
         .build()
         .unwrap();
 
-    println!("Settings: {:?}", settings);
+    let config: AppConfig = settings.try_deserialize().unwrap();
 
     // Build the supervisor with initial tasks
     let supervisor = SupervisorBuilder::default().build();
@@ -28,6 +37,11 @@ async fn main() {
             "influx_sender",
             InfluxSender {
                 records_rx: std::sync::Arc::new(tokio::sync::Mutex::new(rx)),
+                influx_config: config.influx,
+                upload_config: config.upload.unwrap_or(UploadConfig {
+                    max_events: 100,
+                    flush_interval: std::time::Duration::from_secs(15),
+                }),
             },
         )
         .unwrap();
