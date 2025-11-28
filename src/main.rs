@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use config::Config;
 use influxdb2::models::data_point::DataPointBuilder;
 use rtl2influx::influx_sender::InfluxConfig;
@@ -5,6 +7,7 @@ use rtl2influx::influx_sender::InfluxSender;
 use rtl2influx::influx_sender::UploadConfig;
 use rtl2influx::rtl_runner::RtlRunner;
 use rtl2influx::sensor_tagger::SensorTagger;
+use rtl2influx::sensor_tagger::SensorTypeConfig;
 use task_supervisor::SupervisorBuilder;
 
 #[derive(serde::Deserialize)]
@@ -12,11 +15,14 @@ struct AppConfig {
     pub node: String,
     pub influx: InfluxConfig,
     pub upload: Option<UploadConfig>,
+    pub sensors: HashMap<String, SensorTypeConfig>,
 }
 
 #[tokio::main]
 async fn main() {
-    let (tx0, rx0) = tokio::sync::mpsc::channel::<DataPointBuilder>(20);
+    // Raw JSON strings flow from RTL Runner -> Sensor Tagger
+    let (tx0, rx0) = tokio::sync::mpsc::channel::<String>(20);
+    // Tagged DataPointBuilders flow from Sensor Tagger -> Influx Sender
     let (tx1, rx1) = tokio::sync::mpsc::channel::<DataPointBuilder>(20);
 
     let settings = Config::builder()
@@ -27,10 +33,7 @@ async fn main() {
 
     let config: AppConfig = settings.try_deserialize().unwrap();
 
-    // Build the supervisor with initial tasks
     let supervisor = SupervisorBuilder::default().build();
-
-    // Run the supervisor and get the handle
     let handle = supervisor.run();
 
     println!("Adding Influx Sender task...");
@@ -55,6 +58,7 @@ async fn main() {
             SensorTagger {
                 raw_rx: std::sync::Arc::new(tokio::sync::Mutex::new(rx0)),
                 tagged_tx: tx1.clone(),
+                config: config.sensors,
             },
         )
         .unwrap();

@@ -1,10 +1,5 @@
-use crate::records::accurite::AccuriteRecord;
 use async_trait::async_trait;
-use influxdb2::models::DataPoint;
-use influxdb2::models::data_point::DataPointBuilder;
 use std::process::Stdio;
-use std::time::Duration;
-use std::time::SystemTime;
 use task_supervisor::{SupervisedTask, TaskError};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -12,7 +7,7 @@ use tokio::sync::mpsc;
 
 #[derive(Clone)]
 pub struct RtlRunner {
-    pub records_tx: mpsc::Sender<DataPointBuilder>,
+    pub records_tx: mpsc::Sender<String>,
 }
 
 #[async_trait]
@@ -23,44 +18,27 @@ impl SupervisedTask for RtlRunner {
             .stdout(Stdio::piped())
             .spawn()?;
 
-        // 2. Get the stdout handle and wrap it in a BufReader.
         let stdout = child
             .stdout
             .take()
             .expect("Child process did not have a stdout handle");
         let mut reader = BufReader::new(stdout);
 
-        // 3. Create a buffer to read lines into.
         let mut line = String::new();
 
-        // 4. Loop and read lines until EOF.
         while reader.read_line(&mut line).await? != 0 {
-            let record = serde_json::from_str::<AccuriteRecord>(&line)
-                .map_err(|e| TaskError::msg(format!("Failed to parse JSON: {}", e)))?;
-
-            let timestamp_nanos = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos(); // u128
-
-            let line_writeable = DataPoint::builder("test_rtl")
-                .tag("model", &record.model)
-                .tag("channel", &record.channel)
-                .tag("id", format!("{}", record.id).as_str())
-                .field("battery_ok", record.battery_ok)
-                .field("temperature_c", record.temperature_c)
-                .field("humidity", record.humidity as i64)
-                .timestamp(timestamp_nanos as i64);
-
-            self.records_tx
-                .send(line_writeable)
-                .await
-                .map_err(|e| TaskError::msg(format!("Failed to send record: {}", e)))?;
-            line.clear(); // Clear the buffer for the next line
+            let trimmed = line.trim();
+            if trimmed.starts_with('{') && trimmed.ends_with('}') {
+                self.records_tx
+                    .send(trimmed.to_string())
+                    .await
+                    .map_err(|e| TaskError::msg(format!("Failed to send record: {}", e)))?;
+            }
+            line.clear();
         }
 
-        // A task could run forever and never return
-        println!("Task completed!");
+        let status = child.wait().await?;
+        println!("rtl_runner: EOF.  Process exited with status: {}", status);
         Ok(())
     }
 }

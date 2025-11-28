@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use futures::prelude::*;
 use influxdb2::Client;
-use influxdb2::models::DataPoint;
 use influxdb2::models::data_point::DataPointBuilder;
 use std::sync::Arc;
 use std::time::Duration;

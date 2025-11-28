@@ -7,11 +7,11 @@ org = "pks"
 token = "p2dMaSnGf14Bi56d8bJ8SmFDWa_CpdfmlMRV-u9qDLCxAs2Cx_cwadIbvc1jPsu6ripGrR0d5b0TgUgDLrGlNw=="
 bucket = "devel"
 
-[[sensors.10956]]
-tags = { location = "dome kitchen", site = "dome", realm = "interior", zone = 1 }
+[sensors.acutwr.instances.10956]
+tags = { location = "dome kitchen", site = "dome", realm = "interior", zone = "1" }
 
-[[sensors.4242]]
-tags = { location = "dome master bedroom", site = "dome", realm = "interior", zone = 2 }
+[sensors.acutwr.instances.4242]
+tags = { location = "dome master bedroom", site = "dome", realm = "interior", zone = "2" }
 
-[[sensors.6969]]
+[sensors.acutwr.instances.6969]
 tags = { location = "dome north side", site = "dome", realm = "exterior" }
