@@ -1,5 +1,7 @@
 #!/bin/sh
 
+echo "$0 Running.  Arguments: $@"
+
 while true ; do
     epoch=$(date +%s)
     temperature=$(echo "scale = 3 ; sin(${epoch} / 60) * 10.0 + 20" | bc -l)

@@ -1,6 +1,10 @@
 # This logger -- dome, depot, gatehouse
 node = "test_script"
 
+[rtl_runner]
+path = "./fake_rtl.sh"
+args = [ "-a", "-b", "-c" ]
+
 [influx]
 host = "http://localhost:8086"
 org = "pks"
