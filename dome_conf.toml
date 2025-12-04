@@ -1,0 +1,30 @@
+# This logger -- dome, depot, gatehouse
+node = "dome-ticker"
+
+[rtl_runner]
+path = "rtl_433"
+args = [ "-F", "json" ]
+
+[influx]
+host = "http://localhost:8086"
+org = "pks"
+token = "OYPGtKOCEOiICzgu8_zVj5DWueZVGNzVSrglIT-0F7EYuOYmmTUAG6NPDjrJmY2nwG3B3KiTHSoupT1D5q2KqA=="
+bucket = "environment"
+
+[sensors.acutwr.instances.1986]
+tags = { location = "dome kitchen", site = "dome", realm = "interior", zone = "1" }
+
+[sensors.acutwr.instances.10956]
+tags = { location = "dome master bedroom", site = "dome", realm = "interior", zone = "2" }
+
+[sensors.acutwr.instances.6804]
+tags = { location = "dome game room", site = "dome", realm = "interior", zone = "3" }
+
+[sensors.acutwr.instances.1877]
+tags = { location = "dome living area", site = "dome", realm = "interior", zone = "4" }
+
+[sensors.acutwr.instances.3086]
+tags = { location = "dome bath", site = "dome", realm = "interior", zone = "5" }
+
+[sensors.acutwr.instances.11661]
+tags = { location = "dome north side", site = "dome", realm = "exterior" }
