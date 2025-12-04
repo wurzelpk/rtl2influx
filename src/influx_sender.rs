@@ -46,6 +46,7 @@ impl SupervisedTask for InfluxSender {
 
 impl InfluxSender {
     async fn do_upload_pass(&mut self) -> Result<(), TaskError> {
+        println!("InfluxSender: Using token {}", self.influx_config.token);
         let client = Client::new(
             &self.influx_config.host,
             &self.influx_config.org,
