@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use futures::prelude::*;
 use influxdb2::Client;
 use influxdb2::models::data_point::DataPointBuilder;
+use serde_with::{DurationSeconds, serde_as};
 use std::sync::Arc;
 use std::time::Duration;
 use task_supervisor::{SupervisedTask, TaskError};
@@ -16,17 +17,34 @@ pub struct InfluxConfig {
     pub token: String,
 }
 
+#[serde_as]
 #[derive(Clone, serde::Deserialize)]
 pub struct UploadConfig {
     pub max_events: usize,
+    #[serde_as(as = "DurationSeconds<u64>")]
     pub flush_interval: Duration,
 }
 
 #[derive(Clone)]
-pub struct InfluxSender {
+pub struct InfluxSenderConfig {
     pub influx_config: InfluxConfig,
     pub upload_config: UploadConfig,
     pub records_rx: Arc<Mutex<mpsc::Receiver<DataPointBuilder>>>,
+}
+
+#[derive(Clone)]
+pub struct InfluxSenderStatus {
+    pub events_uploaded: Arc<Mutex<usize>>,
+    pub last_upload_time: Arc<Mutex<std::time::Instant>>,
+}
+
+#[derive(Clone)]
+pub struct InfluxSender {
+    influx_config: InfluxConfig,
+    upload_config: UploadConfig,
+    records_rx: Arc<Mutex<mpsc::Receiver<DataPointBuilder>>>,
+    events_uploaded: Arc<Mutex<usize>>,
+    last_upload_time: Arc<Mutex<std::time::Instant>>,
 }
 
 #[async_trait]
@@ -39,12 +57,22 @@ impl SupervisedTask for InfluxSender {
                     println!("Error during InfluxDB upload pass: {}", e);
                 }
             }
+
             tokio::time::sleep(self.upload_config.flush_interval).await;
         }
     }
 }
 
 impl InfluxSender {
+    pub fn new(config: InfluxSenderConfig, status: InfluxSenderStatus) -> Self {
+        InfluxSender {
+            influx_config: config.influx_config,
+            upload_config: config.upload_config,
+            records_rx: config.records_rx,
+            events_uploaded: status.events_uploaded,
+            last_upload_time: status.last_upload_time,
+        }
+    }
     async fn do_upload_pass(&mut self) -> Result<(), TaskError> {
         let client = Client::new(
             &self.influx_config.host,
@@ -79,7 +107,8 @@ impl InfluxSender {
             println!("No points to upload in this pass.");
             return Ok(());
         }
-        println!("Uploading {} points to InfluxDB...", points.len());
+        let point_count = points.len();
+        println!("Uploading {} points to InfluxDB...", point_count);
         if true {
             for p in &points {
                 println!("Point: {:?}", p);
@@ -89,42 +118,10 @@ impl InfluxSender {
             .write(&self.influx_config.bucket, stream::iter(points))
             .await
             .map_err(|e| TaskError::msg(format!("Failed to write to InfluxDB: {}", e)))?;
+
+        *(self.events_uploaded.lock().await) += point_count;
+        *(self.last_upload_time.lock().await) = std::time::Instant::now();
         println!("Upload complete.");
         Ok(())
     }
 }
-
-//             match rx.recv().await {
-//                 Some(record) => {
-//                     let point = record.build()?;
-//                     println!("Received record: {:?}", point);
-//                     // Here you would add code to send the record to InfluxDB
-//                     send_line(point).await.map_err(|e| {
-//                         TaskError::msg(format!("Failed to send to InfluxDB: {}", e))
-//                     })?;
-//                 }
-//                 None => {
-//                     println!("Channel closed, stopping InfluxSender task.");
-//                     break;
-//                 }
-//             }
-//         }
-//         Ok(())
-//     }
-// }
-
-// async fn send_line(point: DataPoint) -> Result<(), Box<dyn std::error::Error>> {
-//     let host = "http://localhost:8086";
-//     let org = "pks";
-//     let token = std::env::var("INFLUX_TOKEN").unwrap();
-//     println!("Using InfluxDB token: {}", token);
-//     let bucket = "devel";
-//     let client = Client::new(host, org, token);
-
-//     let points = vec![point];
-
-//     println!("Sending points to InfluxDB...");
-//     client.write(bucket, stream::iter(points)).await?;
-//     println!("Points sent successfully.");
-//     Ok(())
-// }

@@ -2,15 +2,15 @@
 node = "test_script"
 
 [rtl_runner]
-path = "./fake_rtl.sh"
-args = [ "-a", "-b", "-c" ]
+path = "sleep"
+args = [ "5000" ]
 
 [upload]
 max_events = 100
-flush_interval = 5
+flush_interval = 3
 
 [watchdog]
-interval = 15
+interval = 10
 
 [influx]
 host = "http://localhost:8086"

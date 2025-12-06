@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use influxdb2::models::Task;
 use std::process::Stdio;
 use task_supervisor::{SupervisedTask, TaskError};
 use tokio::io::{AsyncBufReadExt, BufReader};

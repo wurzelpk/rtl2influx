@@ -4,17 +4,28 @@ use config::Config;
 use influxdb2::models::data_point::DataPointBuilder;
 use rtl2influx::influx_sender::InfluxConfig;
 use rtl2influx::influx_sender::InfluxSender;
+use rtl2influx::influx_sender::InfluxSenderConfig;
+use rtl2influx::influx_sender::InfluxSenderStatus;
 use rtl2influx::influx_sender::UploadConfig;
 use rtl2influx::rtl_runner::RtlRunner;
 use rtl2influx::rtl_runner::RtlRunnerConfig;
 use rtl2influx::sensor_tagger::SensorTagger;
 use rtl2influx::sensor_tagger::SensorTypeConfig;
+use serde_with::{DurationSeconds, serde_as};
 use task_supervisor::SupervisorBuilder;
+
+#[serde_as]
+#[derive(Clone, serde::Deserialize)]
+struct WatchdogConfig {
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub interval: std::time::Duration,
+}
 
 #[derive(serde::Deserialize)]
 struct AppConfig {
     pub node: String,
     pub rtl_runner: RtlRunnerConfig,
+    pub watchdog: Option<WatchdogConfig>,
     pub influx: InfluxConfig,
     pub upload: Option<UploadConfig>,
     pub sensors: HashMap<String, SensorTypeConfig>,
@@ -42,18 +53,26 @@ async fn main() {
     let supervisor = SupervisorBuilder::default().build();
     let handle = supervisor.run();
 
+    let status = InfluxSenderStatus {
+        events_uploaded: std::sync::Arc::new(tokio::sync::Mutex::new(0)),
+        last_upload_time: std::sync::Arc::new(tokio::sync::Mutex::new(std::time::Instant::now())),
+    };
+
     println!("Adding Influx Sender task...");
     handle
         .add_task(
             "influx_sender",
-            InfluxSender {
-                records_rx: std::sync::Arc::new(tokio::sync::Mutex::new(rx1)),
-                influx_config: config.influx,
-                upload_config: config.upload.unwrap_or(UploadConfig {
-                    max_events: 100,
-                    flush_interval: std::time::Duration::from_secs(15),
-                }),
-            },
+            InfluxSender::new(
+                InfluxSenderConfig {
+                    influx_config: config.influx,
+                    upload_config: config.upload.unwrap_or(UploadConfig {
+                        max_events: 100,
+                        flush_interval: std::time::Duration::from_secs(15),
+                    }),
+                    records_rx: std::sync::Arc::new(tokio::sync::Mutex::new(rx1)),
+                },
+                status.clone(),
+            ),
         )
         .unwrap();
 
@@ -84,7 +103,10 @@ async fn main() {
         tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         match handle.get_all_task_statuses().await {
             Ok(statuses) => {
-                println!("All task statuses:");
+                println!(
+                    "Total events uploaded: {}",
+                    *(status.events_uploaded.lock().await)
+                );
                 for (name, status) in statuses {
                     println!("  {}: {:?}", name, status);
                 }
@@ -94,10 +116,21 @@ async fn main() {
                 break;
             }
         }
+
+        if let Some(watchdog_config) = &config.watchdog {
+            let last_upload_time = *(status.last_upload_time.lock().await);
+            if last_upload_time.elapsed() > watchdog_config.interval {
+                println!(
+                    "Watchdog: No uploads in the last {:?}, exiting.",
+                    watchdog_config.interval
+                );
+                break;
+            }
+        }
     }
 
-    println!("Awaiting task completion...");
-    handle.wait().await.unwrap();
-
+    println!("Shutting down...");
+    handle.shutdown().expect("Failed to shutdown supervisor");
+    handle.wait().await.expect("Failed to wait for supervisor");
     println!("Task has finished.");
 }
