@@ -80,6 +80,22 @@ async fn main() {
         )
         .unwrap();
 
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        match handle.get_all_task_statuses().await {
+            Ok(statuses) => {
+                println!("All task statuses:");
+                for (name, status) in statuses {
+                    println!("  {}: {:?}", name, status);
+                }
+            }
+            Err(e) => {
+                println!("Error getting all task statuses: {}", e);
+                break;
+            }
+        }
+    }
+
     println!("Awaiting task completion...");
     handle.wait().await.unwrap();
 

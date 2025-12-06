@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use influxdb2::models::Task;
 use std::process::Stdio;
 use task_supervisor::{SupervisedTask, TaskError};
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -48,6 +49,6 @@ impl SupervisedTask for RtlRunner {
 
         let status = child.wait().await?;
         println!("rtl_runner: EOF.  Process exited with status: {}", status);
-        Ok(())
+        Err(TaskError::msg("rtl_runner process exited unexpectedly"))
     }
 }
