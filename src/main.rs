@@ -48,8 +48,13 @@ async fn main() {
         .build()
         .unwrap();
 
-    let config: AppConfig = settings.try_deserialize().unwrap();
+    let mut config: AppConfig = settings.try_deserialize().unwrap();
 
+    if config.influx.token.is_empty() {
+        config.influx.token = std::env::var("INFLUX_TOKEN").unwrap_or_else(|_| {
+            panic!("InfluxDB token is required but not provided.");
+        });
+    }
     let supervisor = SupervisorBuilder::default().build();
     let handle = supervisor.run();
 

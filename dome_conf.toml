@@ -8,7 +8,7 @@ args = [ "-F", "json" ]
 [influx]
 host = "http://localhost:8086"
 org = "pks"
-token = "OYPGtKOCEOiICzgu8_zVj5DWueZVGNzVSrglIT-0F7EYuOYmmTUAG6NPDjrJmY2nwG3B3KiTHSoupT1D5q2KqA=="
+token = "" # If blank, will fetch from ${INFLUX_TOKEN}
 bucket = "environment"
 
 [sensors.acutwr.instances.1986]
