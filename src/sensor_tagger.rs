@@ -45,7 +45,8 @@ impl SupervisedTask for SensorTagger {
                         })?;
                     }
                     None => {
-                        println!("Failed to decode record: {}", json);
+                        // Could be bad record or a duplicate
+                        // println!("Failed to decode record: {}", json);
                     }
                 },
                 None => {
@@ -92,7 +93,13 @@ impl SensorTagger {
     }
 
     async fn decode_acurite_record(&mut self, json: &str) -> Option<DataPointBuilder> {
-        let record: AccuriteRecord = serde_json::from_str(json).ok()?;
+        let record: serde_json::Result<AccuriteRecord> = serde_json::from_str(json);
+
+        if let Err(e) = record {
+            println!("Failed to decode: {}: {}", e, json);
+            return None;
+        }
+        let record = record.unwrap();
 
         let timestamp_nanos = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -100,7 +107,7 @@ impl SensorTagger {
             .as_nanos(); // u128
 
         if self.is_dup_acurite_record(record.id as u32, (timestamp_nanos / 1_000_000_000) as u64) {
-            println!("dup");
+            println!("Duplicate: {}", json);
             return None;
         }
         let mut point = DataPoint::builder("acurite_tower")
