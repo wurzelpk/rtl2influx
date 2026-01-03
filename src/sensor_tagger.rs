@@ -25,14 +25,19 @@ pub struct SensorTagger {
     pub raw_rx: Arc<Mutex<mpsc::Receiver<String>>>,
     pub tagged_tx: mpsc::Sender<DataPointBuilder>,
     pub config: HashMap<String, SensorTypeConfig>,
+    acurite_dedup: HashMap<u32, u64>,
 }
 
 #[async_trait]
 impl SupervisedTask for SensorTagger {
     async fn run(&mut self) -> Result<(), TaskError> {
-        let mut rx = self.raw_rx.lock().await;
         loop {
-            match rx.recv().await {
+            let json_opt = {
+                let mut rx = self.raw_rx.lock().await;
+                rx.recv().await
+            };
+
+            match json_opt {
                 Some(json) => match self.decode_record(&json).await {
                     Some(record) => {
                         self.tagged_tx.send(record).await.map_err(|e| {
@@ -54,22 +59,39 @@ impl SupervisedTask for SensorTagger {
 }
 
 impl SensorTagger {
-    async fn decode_record(&self, json: &str) -> Option<DataPointBuilder> {
+    pub fn new(
+        raw_rx: Arc<Mutex<mpsc::Receiver<String>>>,
+        tagged_tx: mpsc::Sender<DataPointBuilder>,
+        config: HashMap<String, SensorTypeConfig>,
+    ) -> Self {
+        Self {
+            raw_rx,
+            tagged_tx,
+            config,
+            acurite_dedup: HashMap::new(),
+        }
+    }
+
+    async fn decode_record(&mut self, json: &str) -> Option<DataPointBuilder> {
         if json.contains("Acurite-Tower") {
-            return self
-                .decode_acurite_record(json, self.config.get("acutwr"))
-                .await;
+            return self.decode_acurite_record(json).await;
         } else {
             println!("Unknown sensor type in record: {}", json);
         }
         None
     }
 
-    async fn decode_acurite_record(
-        &self,
-        json: &str,
-        type_config: Option<&SensorTypeConfig>,
-    ) -> Option<DataPointBuilder> {
+    fn is_dup_acurite_record(&mut self, id: u32, timestamp_s: u64) -> bool {
+        if let Some(stamp_s) = self.acurite_dedup.get(&id) {
+            if timestamp_s - stamp_s < 5 {
+                return true;
+            }
+        }
+        self.acurite_dedup.insert(id, timestamp_s);
+        false
+    }
+
+    async fn decode_acurite_record(&mut self, json: &str) -> Option<DataPointBuilder> {
         let record: AccuriteRecord = serde_json::from_str(json).ok()?;
 
         let timestamp_nanos = SystemTime::now()
@@ -77,16 +99,20 @@ impl SensorTagger {
             .unwrap()
             .as_nanos(); // u128
 
+        if self.is_dup_acurite_record(record.id as u32, (timestamp_nanos / 1_000_000_000) as u64) {
+            println!("dup");
+            return None;
+        }
         let mut point = DataPoint::builder("acurite_tower")
             .tag("model", &record.model)
             // .tag("channel", &record.channel) // Some sensors have flaky channel dip switches
             .tag("id", format!("{}", record.id).as_str())
-            .field("battery_low", if record.battery_ok {0} else {1})
+            .field("battery_low", if record.battery_ok { 0 } else { 1 })
             .field("temp_c", record.temperature_c)
             .field("humidity", record.humidity as i64)
             .timestamp(timestamp_nanos as i64);
 
-        if let Some(cfg) = type_config {
+        if let Some(cfg) = &self.config.get("acutwr") {
             if let Some(tagset) = cfg.instances.get(&record.id.to_string()) {
                 for (k, v) in &tagset.tags {
                     point = point.tag(k, v);

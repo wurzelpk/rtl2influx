@@ -86,11 +86,11 @@ async fn main() {
     handle
         .add_task(
             "sensor_tagger",
-            SensorTagger {
-                raw_rx: std::sync::Arc::new(tokio::sync::Mutex::new(rx0)),
-                tagged_tx: tx1.clone(),
-                config: config.sensors,
-            },
+            SensorTagger::new(
+                std::sync::Arc::new(tokio::sync::Mutex::new(rx0)),
+                tx1.clone(),
+                config.sensors,
+            ),
         )
         .unwrap();
 
