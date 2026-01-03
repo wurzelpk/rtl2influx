@@ -23,6 +23,7 @@ struct WatchdogConfig {
 
 #[derive(serde::Deserialize)]
 struct AppConfig {
+    #[allow(unused)]
     pub node: String,
     pub rtl_runner: RtlRunnerConfig,
     pub watchdog: Option<WatchdogConfig>,

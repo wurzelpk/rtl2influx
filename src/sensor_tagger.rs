@@ -79,9 +79,9 @@ impl SensorTagger {
 
         let mut point = DataPoint::builder("acurite_tower")
             .tag("model", &record.model)
-            .tag("channel", &record.channel)
+            // .tag("channel", &record.channel) // Some sensors have flaky channel dip switches
             .tag("id", format!("{}", record.id).as_str())
-            .field("battery_ok", record.battery_ok)
+            .field("battery_low", if record.battery_ok {0} else {1})
             .field("temp_c", record.temperature_c)
             .field("humidity", record.humidity as i64)
             .timestamp(timestamp_nanos as i64);
